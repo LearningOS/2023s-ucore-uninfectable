@@ -2,6 +2,7 @@
 #include "defs.h"
 #include "loader.h"
 #include "syscall_ids.h"
+#include "proc.h"
 #include "timer.h"
 #include "trap.h"
 
@@ -36,6 +37,21 @@ uint64 sys_gettimeofday(TimeVal *val, int _tz)
 	return 0;
 }
 
+uint64 sys_task_info(struct TaskInfo *ti){
+	// printf("%d\n",ti->syscall_times[169]);
+	for( int i = 0 ; i < MAX_SYSCALL_NUM ; ++i ){
+		ti->syscall_times[i] = curr_proc()->TaskInfo.syscall_times[i];
+	}
+	// printf("%d\n",ti->syscall_times[169]);
+	ti->time = get_cycle()/(CPU_FREQ/1000)-curr_proc()->stime;
+	// uint64 cc = get_cycle();
+	// uint64 sec = cc/CPU_FREQ;
+	// uint64 usec = (cc % CPU_FREQ) * 1000000 / CPU_FREQ;
+	// printf("%d\n%d\n",sec*1000+usec/1000,curr_proc()->stime);
+	// printf("%d",ti->time);
+	ti->status = Running;
+	return 0;
+}
 /*
 * LAB1: you may need to define sys_task_info here
 */
@@ -50,6 +66,7 @@ void syscall()
 			   trapframe->a3, trapframe->a4, trapframe->a5 };
 	tracef("syscall %d args = [%x, %x, %x, %x, %x, %x]", id, args[0],
 	       args[1], args[2], args[3], args[4], args[5]);
+	curr_proc()->TaskInfo.syscall_times[id] += 1;
 	/*
 	* LAB1: you may need to update syscall counter for task info here
 	*/
@@ -65,6 +82,9 @@ void syscall()
 		break;
 	case SYS_gettimeofday:
 		ret = sys_gettimeofday((TimeVal *)args[0], args[1]);
+		break;
+	case SYS_task_info:
+		ret = sys_task_info((struct TaskInfo *)args[0]);
 		break;
 	/*
 	* LAB1: you may need to add SYS_taskinfo case here

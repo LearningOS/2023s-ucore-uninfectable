@@ -48,6 +48,9 @@ int run_all_app()
 		trapframe->epc = entry;
 		trapframe->sp = (uint64)p->ustack + USER_STACK_SIZE;
 		p->state = RUNNABLE;
+		for (short i = 0; i < MAX_SYSCALL_NUM; i++){
+			p->TaskInfo.syscall_times[i] = 0;
+		}
 		/*
 		* LAB1: you may need to initialize your new fields of proc here
 		*/
