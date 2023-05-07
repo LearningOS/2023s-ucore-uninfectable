@@ -68,9 +68,17 @@ int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
 	if( len > (1<<20) ) return -1;
 	if( (uint64)start % 4096 ) return -1;
 	if( len % 4096 ) return -1;
-	uint64 pa = (uint64)kalloc();
-	pagetable_t pt = (pagetable_t) pa;
-	return mappages(pt,(uint64)start,len,pa,port);
+	uint64 pa = kalloc();
+	pagetable_t pt = (pagetable_t *)pa;
+	pte_t *pte;
+	if ((pte = walk(pt, (uint64)start, 1)) == 0)
+			return -1;
+	if (*pte & PTE_V) {
+		errorf("remap");
+		return -1;
+	}
+	*pte = PA2PTE(pa) | port | PTE_V | PTE_U;
+	return 0;
 }
 
 int munmap(void* start, unsigned long long len){
