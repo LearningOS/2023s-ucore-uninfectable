@@ -68,7 +68,9 @@ int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
 	if( len > (1<<20) ) return -1;
 	if( (uint64)start % 4096 ) return -1;
 	if( len % 4096 ) return -1;
-	return mappages(curr_proc()->paetable,(uint64)start,len,(uint64)kalloc(),port);
+	uint64 pa = (uint64)kalloc();
+	pagetable_t pt = (pagetable_t) pa;
+	return mappages(pt,(uint64)start,len,pa,port);
 }
 
 int munmap(void* start, unsigned long long len){
