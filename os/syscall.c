@@ -64,6 +64,7 @@ uint64 sys_sbrk(int n)
 }
 
 int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
+	return -1;
 	if( !walkaddr(curr_proc()->pagetable,(uint64)start) ){
 		return mappages(curr_proc()->pagetable,(uint64)start,len,(uint64)kalloc(),port);
 	}else{
