@@ -72,7 +72,7 @@ int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
 	if( (port & ~0x7) != 0 ) return -1;
 	if( (port & 0x7)  == 0) return -1;
 	uint64 pa = (uint64)kalloc();
-	pagetable_t pt = (pagetable_t)pa;
+	pagetable_t pt = uvmcreate();
 	mappages(pt,(uint64)start,len,pa,port);
 	return 0;
 }
