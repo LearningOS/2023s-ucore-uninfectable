@@ -60,16 +60,15 @@ uint64 sys_sbrk(int n)
         addr = p->program_brk;
         if(growproc(n) < 0)
                 return -1;
-        return addr;	
+        return addr;
 }
 
 int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
-	return -1;
-	if( !walkaddr(curr_proc()->pagetable,(uint64)start) ){
-		return mappages(curr_proc()->pagetable,(uint64)start,len,(uint64)kalloc(),port);
-	}else{
-		return -1;
-	}
+	if( len == 0 ) return 0;
+	if( len > (1<<20) ) return -1;
+	if( (uint64)start % 4096 ) return -1;
+	if( len % 4096 ) return -1;
+	return mappages(curr_proc()->paetable,(uint64)start,len,(uint64)kalloc(),port);
 }
 
 int munmap(void* start, unsigned long long len){
