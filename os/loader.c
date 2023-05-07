@@ -69,6 +69,10 @@ int run_all_app()
 		tracef("load app %d", i);
 		bin_loader(app_info_ptr[i], app_info_ptr[i + 1], p);
 		p->state = RUNNABLE;
+		p->stime = 0;
+		for (int i = 0; i < MAX_SYSCALL_NUM; i++){
+			p->syscall_times[i] = 0;
+		}
 		/*
 		* LAB1: you may need to initialize your new fields of proc here
 		*/

@@ -2,6 +2,7 @@
 #include "defs.h"
 #include "loader.h"
 #include "trap.h"
+#include "timer.h"
 #include "vm.h"
 
 struct proc pool[NPROC];
@@ -23,6 +24,7 @@ struct proc *curr_proc()
 }
 
 // initialize the proc table at boot time.
+
 void proc_init(void)
 {
 	struct proc *p;
@@ -85,9 +87,7 @@ void scheduler(void)
 	for (;;) {
 		for (p = pool; p < &pool[NPROC]; p++) {
 			if (p->state == RUNNABLE) {
-				/*
-				* LAB1: you may need to init proc start time here
-				*/
+				if(!p->stime) p->stime = get_cycle()/(CPU_FREQ/1000);
 				p->state = RUNNING;
 				current_proc = p;
 				swtch(&idle.context, &p->context);
@@ -130,6 +130,10 @@ void exit(int code)
 	struct proc *p = curr_proc();
 	infof("proc %d exit with %d", p->pid, code);
 	freeproc(p);
+	for (int i = 0; i < MAX_SYSCALL_NUM; i++){
+		p->syscall_times[i] = 0;
+	}
+	p->stime=0;
 	finished();
 	sched();
 }

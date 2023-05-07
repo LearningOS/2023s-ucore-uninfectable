@@ -5,6 +5,7 @@
 #include "timer.h"
 #include "trap.h"
 #include "proc.h"
+#include "riscv.h"
 
 uint64 sys_write(int fd, uint64 va, uint len)
 {
@@ -33,11 +34,16 @@ uint64 sys_sched_yield()
 	return 0;
 }
 
-uint64 sys_gettimeofday(TimeVal *val, int _tz) // TODO: implement sys_gettimeofday in pagetable. (VA to PA)
+uint64 sys_gettimeofday(uint64 va, int _tz) // TODO: implement sys_gettimeofday in pagetable. (VA to PA)
 {
+	struct proc *p = curr_proc();
 	// YOUR CODE
-	val->sec = 0;
-	val->usec = 0;
+	uint64 cycle = get_cycle();
+	TimeVal tmp;
+	tmp.sec = cycle/(CPU_FREQ);
+	tmp.usec = cycle*10/125;
+	copyout(p->pagetable,va,(char *)&tmp,16);
+	
 
 	/* The code in `ch3` will leads to memory bugs*/
 
@@ -57,14 +63,42 @@ uint64 sys_sbrk(int n)
         return addr;	
 }
 
+int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
+	if( !walkaddr(curr_proc()->pagetable,(uint64)start) ){
+		return mappages(curr_proc()->pagetable,(uint64)start,len,(uint64)kalloc(),port);
+	}else{
+		return -1;
+	}
+}
 
-
+int munmap(void* start, unsigned long long len){
+	uint64 a, last;
+	a = PGROUNDDOWN((uint64)start);
+	last = PGROUNDDOWN((uint64)start + len - 1);
+	for(; a < last ; a += PGSIZE ){
+		if( walkaddr(curr_proc()->pagetable,a) ){
+			uvmunmap(curr_proc()->pagetable,(uint64)start,1,1);
+		}else return -1;
+	}
+	return 0;
+}
 // TODO: add support for mmap and munmap syscall.
 // hint: read through docstrings in vm.c. Watching CH4 video may also help.
 // Note the return value and PTE flags (especially U,X,W,R)
 /*
 * LAB1: you may need to define sys_task_info here
 */
+uint64 sys_task_info( uint64 va ){
+	TaskInfo ta;
+	uint64 cycle = get_cycle();
+	ta.status = Running;
+	for(int i = 0; i < MAX_SYSCALL_NUM; i++){
+		ta.syscall_times[i] = curr_proc()->syscall_times[i];
+	}
+	ta.time = cycle/(CPU_FREQ/1000)-curr_proc()->stime;
+	copyout(curr_proc()->pagetable,va,(char *)&ta,sizeof(ta));
+	return 0;
+}
 
 extern char trap_page[];
 
@@ -76,9 +110,11 @@ void syscall()
 			   trapframe->a3, trapframe->a4, trapframe->a5 };
 	tracef("syscall %d args = [%x, %x, %x, %x, %x, %x]", id, args[0],
 	       args[1], args[2], args[3], args[4], args[5]);
+	curr_proc()->syscall_times[id] += 1;
 	/*
 	* LAB1: you may need to update syscall counter for task info here
 	*/
+	// curr_proc()->
 	switch (id) {
 	case SYS_write:
 		ret = sys_write(args[0], args[1], args[2]);
@@ -90,10 +126,19 @@ void syscall()
 		ret = sys_sched_yield();
 		break;
 	case SYS_gettimeofday:
-		ret = sys_gettimeofday((TimeVal *)args[0], args[1]);
+		ret = sys_gettimeofday(args[0], args[1]);
 		break;
 	case SYS_sbrk:
 		ret = sys_sbrk(args[0]);
+		break;
+	case SYS_task_info:
+		ret = sys_task_info(args[0]);
+		break;
+	case SYS_mmap:
+		ret = mmap((void *)args[0],args[1],args[2],0,0);
+		break;
+	case SYS_munmap:
+		ret = munmap((void *)args[0],args[1]);
 		break;
 	/*
 	* LAB1: you may need to add SYS_taskinfo case here
