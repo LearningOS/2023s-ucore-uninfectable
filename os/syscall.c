@@ -5,7 +5,7 @@
 #include "timer.h"
 #include "trap.h"
 #include "proc.h"
-#include "vm.h"
+// #include "vm.h"
 #include "riscv.h"
 
 uint64 sys_write(int fd, uint64 va, uint len)
@@ -54,6 +54,8 @@ uint64 sys_gettimeofday(uint64 va, int _tz) // TODO: implement sys_gettimeofday 
 	return 0;
 }
 
+pte_t *walk(pagetable_t pagetable, uint64 va, int alloc);
+
 uint64 sys_sbrk(int n)
 {
 	uint64 addr;
@@ -74,7 +76,26 @@ int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
 	uint64 pa = (uint64)kalloc();
 	// pagetable_t pt = uvmcreate();
 	// printf("%d %d",len,port);
-	mappages(curr_proc()->pagetable,(uint64)start,len,pa,port);
+	// mappages(curr_proc()->pagetable,(uint64)start,len,pa,port);
+	uint64 a;
+	pte_t *pte;
+
+	a = (uint64)start;
+	
+	for (;;) {
+		if ((pte = walk(curr_proc()->pagetable, a, 1)) == 0)
+			return -1;
+		if (*pte & PTE_V) {
+			errorf("remap");
+			return -1;
+		}
+		*pte = PA2PTE(pa) | port | PTE_V | PTE_U;
+		if (len == 0)
+			break;
+		a += PGSIZE;
+		pa += PGSIZE;
+		len -= 4096;
+	}
 	return 0;
 }
 
