@@ -5,6 +5,7 @@
 #include "timer.h"
 #include "trap.h"
 #include "proc.h"
+#include "vm.h"
 #include "riscv.h"
 
 uint64 sys_write(int fd, uint64 va, uint len)
@@ -71,7 +72,7 @@ int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
 	uint64 pa = kalloc();
 	pagetable_t pt = (pagetable_t *)pa;
 	pte_t *pte;
-	if ((pte = walk(pt, (uint64)start, 1)) == 0)
+	if ((pte = (PA2PTE(walkaddr(pt, (uint64)start)))) == 0)
 			return -1;
 	if (*pte & PTE_V) {
 		errorf("remap");
