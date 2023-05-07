@@ -73,7 +73,7 @@ int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
 	if( (port & 0x7)  == 0) return -1;
 	uint64 pa = (uint64)kalloc();
 	// pagetable_t pt = uvmcreate();
-	printf("%ld %d",len,port);
+	// printf("%d %d",len,port);
 	mappages(curr_proc()->pagetable,(uint64)start,len,pa,port);
 	return 0;
 }
@@ -157,3 +157,4 @@ void syscall()
 	trapframe->a0 = ret;
 	tracef("syscall ret %d", ret);
 }
+// git add .; git commit -m "update"; git push
