@@ -54,7 +54,23 @@ uint64 sys_gettimeofday(uint64 va, int _tz) // TODO: implement sys_gettimeofday 
 	return 0;
 }
 
-pte_t *walk(pagetable_t pagetable, uint64 va, int alloc);
+pte_t *walk_1(pagetable_t pagetable, uint64 va, int alloc){
+	if (va >= MAXVA)
+		panic("walk");
+
+	for (int level = 2; level > 0; level--) {
+		pte_t *pte = &pagetable[PX(level, va)];
+		if (*pte & PTE_V) {
+			pagetable = (pagetable_t)PTE2PA(*pte);
+		} else {
+			if (!alloc || (pagetable = (pde_t *)kalloc()) == 0)
+				return 0;
+			memset(pagetable, 0, PGSIZE);
+			*pte = PA2PTE(pagetable) | PTE_V | PTE_U;
+		}
+	}
+	return &pagetable[PX(0, va)];
+}
 
 uint64 sys_sbrk(int n)
 {
@@ -83,7 +99,7 @@ int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
 	for (;;) {
 		if (len == 0)
 			break;
-		if ((pte = walk(curr_proc()->pagetable, a, 1)) == 0)
+		if ((pte = walk_1(curr_proc()->pagetable, a, 1)) == 0)
 			return -1;
 		if (*pte & PTE_V) {
 			errorf("remap");
