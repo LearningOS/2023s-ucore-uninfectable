@@ -94,8 +94,13 @@ uint64 sys_wait(int pid, uint64 va)
 
 uint64 sys_spawn(uint64 va)
 {
-	// TODO: your job is to complete the sys call
-	return -1;
+	int pid = fork();
+	wait(pid,0);
+	char name[200];
+	if(copyinstr(curr_proc()->pagetable, name, va, 200) == -1 ) return -1;
+	exec(name);
+	return wait(-1,0);
+	// return pid;
 }
 
 uint64 sys_set_priority(long long prio){
@@ -168,3 +173,4 @@ void syscall()
 	trapframe->a0 = ret;
 	tracef("syscall ret %d", ret);
 }
+// git add .; git commit -m "update"; git push
