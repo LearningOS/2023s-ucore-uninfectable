@@ -74,24 +74,22 @@ int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
 	if( (port & ~0x7) != 0 ) return -1;
 	if( (port & 0x7)  == 0) return -1;
 	uint64 pa = (uint64)kalloc();
-	pagetable_t pt = (pagetable_t)pa;
 	// printf("%d %d",len,port);
 	// mappages(curr_proc()->pagetable,(uint64)start,len,pa,port);
 	uint64 a;
 	pte_t *pte;
-
 	a = (uint64)start;
 	
 	for (;;) {
-		if ((pte = walk(pt, a, 1)) == 0)
+		if (len == 0)
+			break;
+		if ((pte = walk(curr_proc()->pagetable, a, 1)) == 0)
 			return -1;
 		if (*pte & PTE_V) {
 			errorf("remap");
 			return -1;
 		}
 		*pte = PA2PTE(pa) | port | PTE_V | PTE_U;
-		if (len == 0)
-			break;
 		a += PGSIZE;
 		pa += PGSIZE;
 		len -= 4096;
