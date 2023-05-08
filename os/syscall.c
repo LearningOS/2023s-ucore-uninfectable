@@ -105,7 +105,7 @@ int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
 			errorf("remap");
 			return -1;
 		}
-		*pte = PA2PTE(pa) | port | PTE_V | PTE_U;
+		*pte = PA2PTE(pa) | (port<<1) | PTE_V | PTE_U;
 		a += PGSIZE;
 		pa += PGSIZE;
 		len -= 4096;
