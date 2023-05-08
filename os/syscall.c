@@ -91,26 +91,27 @@ int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
 	if( (port & 0x7)  == 0) return -1;
 	uint64 pa = (uint64)kalloc();
 	// printf("%d %d",len,port);
-	// mappages(curr_proc()->pagetable,(uint64)start,len,pa,port);
-	uint64 a, last;
-	pte_t *pte;
-	uint64 va = (uint64)(start);
-	a = PGROUNDDOWN(va);
-	last = PGROUNDDOWN(va + len - 1);
-	for (;;) {
-		if ((pte = walk_1(curr_proc()->pagetable, a, 1)) == 0)
-			return -1;
-		if (*pte & PTE_V) {
-			errorf("remap");
-			return -1;
-		}
-		*pte = PA2PTE(pa) | (port<<1) | PTE_V | PTE_U;
-		if (a == last)
-			break;
-		a += PGSIZE;
-		pa += PGSIZE;
-	}
-	return 0;
+	return mappages(curr_proc()->pagetable,(uint64)start,len,pa,PTE_U|(port<<1));
+	// uint64 a, last;
+	// pte_t *pte;
+	// uint64 va = (uint64)(start);
+	// a = PGROUNDDOWN(va);
+	// last = PGROUNDDOWN(va + len - 1);
+	// printf("%d",port);
+	// for (;;) {
+	// 	if ((pte = walk_1(curr_proc()->pagetable, a, 1)) == 0)
+	// 		return -1;
+	// 	if (*pte & PTE_V) {
+	// 		errorf("remap");
+	// 		return -1;
+	// 	}
+	// 	*pte = PA2PTE(pa) | (port<<1) | PTE_V | PTE_U;
+	// 	if (a == last)
+	// 		break;
+	// 	a += PGSIZE;
+	// 	pa += PGSIZE;
+	// }
+	// return 0;
 }
 
 int munmap(void* start, unsigned long long len){
