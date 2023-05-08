@@ -115,13 +115,18 @@ int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
 }
 
 int munmap(void* start, unsigned long long len){
+	if( (uint64)start % 4096 ) return -1;
+	if( len % 4096 ) return -1;
 	uint64 a, last;
 	a = PGROUNDDOWN((uint64)start);
 	last = PGROUNDDOWN((uint64)start + len - 1);
-	for(; a < last ; a += PGSIZE ){
-		if( walkaddr(curr_proc()->pagetable,a) ){
-			uvmunmap(curr_proc()->pagetable,(uint64)start,1,1);
+	for(;;){
+		if( useraddr(curr_proc()->pagetable,a) ){
+			uvmunmap(curr_proc()->pagetable,(uint64)start,1,0);
 		}else return -1;
+		if (a == last)
+			break;
+		a += PGSIZE;
 	}
 	return 0;
 }
