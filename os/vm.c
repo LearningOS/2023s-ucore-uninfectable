@@ -111,7 +111,7 @@ void kvmmap(pagetable_t kpgtbl, uint64 va, uint64 pa, uint64 sz, int perm)
 // allocate a needed page-table page.
 int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 {
-	uint64 a, last;
+	uint64 a, last, page = 0;
 	pte_t *pte;
 
 	a = PGROUNDDOWN(va);
@@ -130,6 +130,8 @@ int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 			break;
 		a += PGSIZE;
 		pa += PGSIZE;
+		page += 1;
+		// if( a/PAGE_SIZE+page >= curr_proc()->max_page ) curr_proc()->max_page = a/PAGE_SIZE+page+1;
 	}
 	return 0;
 }

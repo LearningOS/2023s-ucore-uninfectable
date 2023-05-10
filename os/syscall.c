@@ -98,12 +98,25 @@ int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
 	if( (uint64)start % 4096 ) return -1;
 	if( (port & ~0x7) != 0 ) return -1;
 	if( (port & 0x7)  == 0) return -1;
-	uint64 pa = (uint64)kalloc();
-	if(!mappages(curr_proc()->pagetable,(uint64)start,len,pa,PTE_U|(port<<1) )){
-		curr_proc()->max_page = curr_proc()->max_page>((uint64)start+len+PAGE_SIZE-1)/PAGE_SIZE ? curr_proc()->max_page : ((uint64)start+len+PAGE_SIZE-1)/PAGE_SIZE;
-		return 0;
+	// uint64 pa = (uint64)kalloc();
+	// if(!mappages(curr_proc()->pagetable,(uint64)start,len,pa,PTE_U|(port<<1) )){
+	// 	return 0;
+	// }
+	// return -1;
+	uint64 va = (uint64)start;
+	uint64 pages = (len + PGSIZE - 1) / PGSIZE;
+	for (uint64 i = 0; i < pages; i++) {
+		uint64 pa = (uint64)kalloc();
+		if( pa == 0 ){
+			return -1;
+		}
+		if( mappages(curr_proc()->pagetable,va+i*PAGE_SIZE,PAGE_SIZE,pa,PTE_U|(port<<1)) != 0 ){
+			return -1;
+		}
+		uint64 sz = va/PAGE_SIZE+i+1;
+		if( sz > curr_proc()->max_page ) curr_proc()->max_page = sz;
 	}
-	return -1;
+	return 0;
 }
 
 int munmap(void* start, unsigned long long len){
