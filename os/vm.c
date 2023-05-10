@@ -122,7 +122,7 @@ int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 			return -1;
 		}
 		if (*pte & PTE_V) {
-			errorf("remap");
+			// errorf("remap");
 			return -1;
 		}
 		*pte = PA2PTE(pa) | perm | PTE_V;

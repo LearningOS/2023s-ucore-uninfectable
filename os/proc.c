@@ -4,6 +4,7 @@
 #include "trap.h"
 #include "vm.h"
 #include "queue.h"
+#include "timer.h"
 
 struct proc pool[NPROC];
 __attribute__((aligned(16))) char kstack[NPROC][PAGE_SIZE];
@@ -94,6 +95,10 @@ found:
 	p->context.sp = p->kstack + KSTACK_SIZE;
 	p->stride = 0;
 	p->priority = 2;
+	p->stime = 0;
+	// for (short i = 0; i < MAX_SYSCALL_NUM; i++){
+	// 	p->syscall_times[i] = 0;
+	// }
 	return p;
 }
 
@@ -129,6 +134,7 @@ void scheduler()
 		np->state = RUNNING;
 		current_proc = np;
 		np->stride += big_stride/np->priority;
+		if(!np->stime) np->stime = get_cycle()/(CPU_FREQ/1000);
 		swtch(&idle.context, &np->context);
 	}
 }
@@ -257,6 +263,10 @@ void exit(int code)
 		if (np->parent == p) {
 			np->parent = NULL;
 		}
+	}
+	p->stime = 0;
+	for (int i = 0; i < MAX_SYSCALL_NUM; i++){
+		p->syscall_times[i] = 0;
 	}
 	sched();
 }

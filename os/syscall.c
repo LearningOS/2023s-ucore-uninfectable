@@ -168,6 +168,19 @@ uint64 sys_sbrk(int n)
         return addr;
 }
 
+uint64 sys_task_info( uint64 va ){
+	struct TaskInfo ta;
+	uint64 cycle = get_cycle();
+	ta.status = Running;
+	for(int i = 0; i < MAX_SYSCALL_NUM; i++){
+		ta.syscall_times[i] = (uint64)(curr_proc()->syscall_times[i]);
+	}
+	// printf("%d",ta.syscall_times[169]);
+	ta.time = cycle/(CPU_FREQ/1000)-curr_proc()->stime;
+	copyout(curr_proc()->pagetable,va,(char *)&ta,sizeof(ta));
+	return 0;
+}
+
 extern char trap_page[];
 
 void syscall()
@@ -178,6 +191,7 @@ void syscall()
 			   trapframe->a3, trapframe->a4, trapframe->a5 };
 	tracef("syscall %d args = [%x, %x, %x, %x, %x, %x]", id, args[0],
 	       args[1], args[2], args[3], args[4], args[5]);
+	curr_proc()->syscall_times[id] += 1;
 	switch (id) {
 	case SYS_write:
 		ret = sys_write(args[0], args[1], args[2]);
@@ -223,6 +237,9 @@ void syscall()
         break;
 	case SYS_setpriority:
 		ret = sys_set_priority(args[0]);
+		break;
+	case SYS_taskinfo:
+		ret = sys_task_info(args[0]);
 		break;
 	default:
 		ret = -1;
