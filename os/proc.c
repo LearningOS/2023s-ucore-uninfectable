@@ -59,6 +59,7 @@ struct proc *fetch_task()
 void add_task(struct proc *p)
 {
 	push_queue(&task_queue, p - pool);
+	pop_queue(&task_queue);
 	debugf("add task %d(pid=%d) to task queue\n", p - pool, p->pid);
 }
 
@@ -85,12 +86,14 @@ found:
 	p->exit_code = 0;
 	p->pagetable = uvmcreate((uint64)p->trapframe);
 	p->program_brk = 0;
-        p->heap_bottom = 0;
+    p->heap_bottom = 0;
 	memset(&p->context, 0, sizeof(p->context));
 	memset((void *)p->kstack, 0, KSTACK_SIZE);
 	memset((void *)p->trapframe, 0, TRAP_PAGE_SIZE);
 	p->context.ra = (uint64)usertrapret;
 	p->context.sp = p->kstack + KSTACK_SIZE;
+	p->stride = 0;
+	p->priority = 2;
 	return p;
 }
 
@@ -103,27 +106,30 @@ void scheduler()
 {
 	struct proc *p;
 	for (;;) {
-		/*int has_proc = 0;
+		int has_proc = 0;
+		struct proc *np = pool;
 		for (p = pool; p < &pool[NPROC]; p++) {
 			if (p->state == RUNNABLE) {
 				has_proc = 1;
 				tracef("swtich to proc %d", p - pool);
-				p->state = RUNNING;
-				current_proc = p;
-				swtch(&idle.context, &p->context);
+				np = np->stride < p->stride ? np : p;
+				// p->state = RUNNING;
+				// current_proc = p;
+				// swtch(&idle.context, &p->context);
 			}
 		}
 		if(has_proc == 0) {
 			panic("all app are over!\n");
-		}*/
-		p = fetch_task();
-		if (p == NULL) {
-			panic("all app are over!\n");
 		}
-		tracef("swtich to proc %d", p - pool);
-		p->state = RUNNING;
-		current_proc = p;
-		swtch(&idle.context, &p->context);
+		// p = fetch_task();
+		// if (p == NULL) {
+		// 	panic("all app are over!\n");
+		// }
+		// tracef("swtich to proc %d", p - pool);
+		np->state = RUNNING;
+		current_proc = np;
+		np->stride += big_stride/np->priority;
+		swtch(&idle.context, &np->context);
 	}
 }
 
@@ -186,6 +192,7 @@ int fork()
 	np->trapframe->a0 = 0;
 	np->parent = p;
 	np->state = RUNNABLE;
+	np->stride = p->stride;
 	add_task(np);
 	return np->pid;
 }

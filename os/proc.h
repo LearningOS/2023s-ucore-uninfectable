@@ -7,7 +7,7 @@
 
 #define NPROC (512)
 #define FD_BUFFER_SIZE (16)
-
+#define big_stride 65536
 struct file;
 
 // Saved registers for kernel context switches.
@@ -47,6 +47,8 @@ struct proc {
 	struct file *files[FD_BUFFER_SIZE];
 	uint64 program_brk;
 	uint64 heap_bottom;
+	uint64 priority;
+	uint64 stride;
 };
 
 int cpuid();

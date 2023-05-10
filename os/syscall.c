@@ -92,20 +92,56 @@ uint64 sys_wait(int pid, uint64 va)
 	return wait(pid, code);
 }
 
+int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
+	if( len == 0 ) return 0;
+	if( len > (1<<20) ) return -1;
+	if( (uint64)start % 4096 ) return -1;
+	if( (port & ~0x7) != 0 ) return -1;
+	if( (port & 0x7)  == 0) return -1;
+	uint64 pa = (uint64)kalloc();
+	if(!mappages(curr_proc()->pagetable,(uint64)start,len,pa,PTE_U|(port<<1) )){
+		curr_proc()->max_page = curr_proc()->max_page>((uint64)start+len+PAGE_SIZE-1)/PAGE_SIZE ? curr_proc()->max_page : ((uint64)start+len+PAGE_SIZE-1)/PAGE_SIZE;
+		return 0;
+	}
+	return -1;
+}
+
+int munmap(void* start, unsigned long long len){
+	if( (uint64)start % 4096 ) return -1;
+	if( len % 4096 ) return -1;
+	uint64 a, last;
+	a = PGROUNDDOWN((uint64)start);
+	last = PGROUNDDOWN((uint64)start + len - 1);
+	for(;;){
+		if( useraddr(curr_proc()->pagetable,a) ){
+			uvmunmap(curr_proc()->pagetable,(uint64)start,1,0);
+		}else return -1;
+		if (a == last)
+			break;
+		a += PGSIZE;
+		// curr_proc()->max_page -= 1;
+	}
+	return 0;
+}
+
 uint64 sys_spawn(uint64 va)
 {
-	int pid = fork();
-	wait(pid,0);
 	char name[200];
-	if(copyinstr(curr_proc()->pagetable, name, va, 200) == -1 ) return -1;
-	exec(name);
-	return wait(-1,0);
+	struct proc *p = curr_proc();
+	struct proc *np = allocproc();
+	copyinstr(p->pagetable,name,va,200);
+	int id = get_id_by_name(name);
+	loader(id,np);
+	add_task(np);
+	np->parent = p;
+	return np->pid;
 	// return pid;
 }
 
 uint64 sys_set_priority(long long prio){
-    // TODO: your job is to complete the sys call
-    return -1;
+    if( prio < 2 ) return -1;
+	curr_proc()->priority = prio;
+	return prio;
 }
 
 
@@ -160,12 +196,21 @@ void syscall()
 	case SYS_wait4:
 		ret = sys_wait(args[0], args[1]);
 		break;
+	case SYS_mmap:
+		ret = mmap((void *)args[0],args[1],args[2],0,0);
+		break;
+	case SYS_munmap:
+		ret = munmap((void *)args[0],args[1]);
+		break;
 	case SYS_spawn:
 		ret = sys_spawn(args[0]);
 		break;
 	case SYS_sbrk:
-                ret = sys_sbrk(args[0]);
-                break;
+        ret = sys_sbrk(args[0]);
+        break;
+	case SYS_setpriority:
+		ret = sys_set_priority(args[0]);
+		break;
 	default:
 		ret = -1;
 		errorf("unknown syscall %d", id);
