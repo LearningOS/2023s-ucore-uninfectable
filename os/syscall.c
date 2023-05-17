@@ -5,7 +5,9 @@
 #include "syscall_ids.h"
 #include "timer.h"
 #include "trap.h"
-
+// #include "fs.h"
+// #include "file.h"
+// int dirunlink(struct inode *dp, char *name, uint inum);
 uint64 console_write(uint64 va, uint64 len)
 {
 	struct proc *p = curr_proc();
@@ -186,14 +188,38 @@ int sys_fstat(int fd, uint64 stat)
 int sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath,
 	       uint64 flags)
 {
-	//TODO: your job is to complete the syscall
-	return -1;
+	struct inode *ip,*dp,*sp;
+	dp = root_dir(); //Remember that the root_inode is open in this step,so it needs closing then.
+	ivalid(dp);
+	if ((ip = dirlookup(dp, (char *)newpath, 0)) != 0) {
+		iput(dp);
+		iput(ip);
+		return -1;
+	}
+	sp = dirlookup(dp,(char *)oldpath,0);
+	ivalid(sp);
+	dirlink(dp,(char *)newpath,sp->inum);
+	iupdate(sp);
+	iput(sp);
+	iput(dp);
+	return 0;
 }
 
 int sys_unlinkat(int dirfd, uint64 name, uint64 flags)
 {
-	//TODO: your job is to complete the syscall
-	return -1;
+	struct inode *ip,*dp;
+	dp = root_dir(); //Remember that the root_inode is open in this step,so it needs closing then.
+	ivalid(dp);
+	if ((ip = dirlookup(dp, (char *)name, 0)) == 0) {
+		iput(dp);
+		// iput(ip);
+		return -1;
+	}
+	iput(ip);
+	dirunlink(dp,(char *)name,ip->inum);
+	// iupdate(ip);
+	iput(dp);
+	return 0;
 }
 
 uint64 sys_sbrk(int n)
