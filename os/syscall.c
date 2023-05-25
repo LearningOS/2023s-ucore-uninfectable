@@ -5,7 +5,6 @@
 #include "syscall_ids.h"
 #include "timer.h"
 #include "trap.h"
-#include "vm.h"
 
 uint64 console_write(uint64 va, uint64 len)
 {
@@ -143,24 +142,69 @@ uint64 sys_wait(int pid, uint64 va)
 	return wait(pid, code);
 }
 
-uint64 sys_spawn(uint64 va)
-{
-	// TODO: your job is to complete the sys call
-	struct proc *p = curr_proc();
-	char name[200];
-	copyinstr(p->pagetable, name, va, 200);
-	return spawn(name);
+int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
+	if( len == 0 ) return 0;
+	if( len > (1<<20) ) return -1;
+	if( (uint64)start % 4096 ) return -1;
+	if( (port & ~0x7) != 0 ) return -1;
+	if( (port & 0x7)  == 0) return -1;
+	// uint64 pa = (uint64)kalloc();
+	// if(!mappages(curr_proc()->pagetable,(uint64)start,len,pa,PTE_U|(port<<1) )){
+	// 	return 0;
+	// }
+	// return -1;
+	uint64 va = (uint64)start;
+	uint64 pages = (len + PGSIZE - 1) / PGSIZE;
+	for (uint64 i = 0; i < pages; i++) {
+		uint64 pa = (uint64)kalloc();
+		if( pa == 0 ){
+			return -1;
+		}
+		if( mappages(curr_proc()->pagetable,va+i*PAGE_SIZE,PAGE_SIZE,pa,PTE_U|(port<<1)) != 0 ){
+			return -1;
+		}
+		uint64 sz = va/PAGE_SIZE+i+1;
+		if( sz > curr_proc()->max_page ) curr_proc()->max_page = sz;
+	}
+	return 0;
 }
 
-uint64 sys_set_priority(long long prio)
-{
-	// TODO: your job is to complete the sys call
-	if (prio >= 2 && prio <= INT_MAX) {
-		struct proc *p = curr_proc();
-		p->pass = BIG_STRIDE / prio;
-		return prio;
+int munmap(void* start, unsigned long long len){
+	if( (uint64)start % 4096 ) return -1;
+	if( len % 4096 ) return -1;
+	uint64 a, last;
+	a = PGROUNDDOWN((uint64)start);
+	last = PGROUNDDOWN((uint64)start + len - 1);
+	for(;;){
+		if( useraddr(curr_proc()->pagetable,a) ){
+			uvmunmap(curr_proc()->pagetable,(uint64)start,1,0);
+		}else return -1;
+		if (a == last)
+			break;
+		a += PGSIZE;
+		// curr_proc()->max_page -= 1;
 	}
-	return -1;
+	return 0;
+}
+
+uint64 sys_spawn(uint64 va)
+{
+	char name[200];
+	struct proc *p = curr_proc();
+	struct proc *np = allocproc();
+	copyinstr(p->pagetable,name,va,200);
+	int id = get_id_by_name(name);
+	loader(id,np);
+	add_task(np);
+	np->parent = p;
+	return np->pid;
+	// return pid;
+}
+
+uint64 sys_set_priority(long long prio){
+    if( prio < 2 ) return -1;
+	curr_proc()->priority = prio;
+	return prio;
 }
 
 uint64 sys_openat(uint64 va, uint64 omode, uint64 _flags)
@@ -186,73 +230,50 @@ uint64 sys_close(int fd)
 	return 0;
 }
 
-#define UNUSED(x) (void)(x)
-int linkat(int olddirfd, char *oldpath, int newdirfd, char *newpath,
-	   unsigned int flags)
-{
-	UNUSED(olddirfd);
-	UNUSED(newdirfd);
-	UNUSED(flags);
-
-	struct inode *old_inode = namei(oldpath);
-	if (old_inode == NULL) {
-		errorf("linked file does not exist.");
-		return -1;
-	}
-	int ret = link(newpath, old_inode);
-	iput(old_inode);
-	return ret;
-}
-int unlinkat(int dirfd, char *path, unsigned int flags)
-{
-	UNUSED(dirfd);
-	UNUSED(flags);
-
-	return unlink(path);
-}
-int fstatat(struct file *file, struct Stat *st)
-{
-	return fstat(file, st);
-}
-
 int sys_fstat(int fd, uint64 stat)
 {
 	//TODO: your job is to complete the syscall
-	struct proc *p = curr_proc();
-	struct file *f = p->files[fd];
-	if (f == NULL) {
-		errorf("invalid fd %d", fd);
-		return -1;
+	return -1;
+}
+
+int link(char *path ){
+	struct inode *ip, *dp;
+	dp = root_dir(); //Remember that the root_inode is open in this step,so it needs closing then.
+	ivalid(dp);
+	if ((ip = dirlookup(dp, path, 0)) != 0) {
+		warnf("create a exist file\n");
+		iput(dp); //Close the root_inode
+		ivalid(ip);
+		if (type == T_FILE && ip->type == T_FILE)
+			return ip;
+		iput(ip);
+		return 0;
 	}
-	struct Stat istat;
-	fstatat(f, &istat);
-	copyout(p->pagetable, stat, (char *)(&istat), sizeof(struct Stat));
-	//fstatat()
-	return 0;
-	//return -1;
+	if ((ip = ialloc(dp->dev, type)) == 0)
+		panic("create: ialloc");
+
+	tracef("create dinode and inode type = %d\n", type);
+
+	ivalid(ip);
+	iupdate(ip);
+	if (dirlink(dp, path, ip->inum) < 0)
+		panic("create: dirlink");
+
+	iput(dp);
+	return ip;
 }
 
 int sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath,
 	       uint64 flags)
 {
-	char old_path[MAX_PATH];
-	char new_path[MAX_PATH];
-	struct proc *p = curr_proc();
-	copyinstr(p->pagetable, old_path, oldpath, MAX_PATH);
-	copyinstr(p->pagetable, new_path, newpath, MAX_PATH);
-	return linkat(olddirfd, old_path, newdirfd, new_path, flags);
-	//TODO: your job is to complete the syscall
-	//return -1;
+	
+	return -1;
 }
 
 int sys_unlinkat(int dirfd, uint64 name, uint64 flags)
 {
-	char filepath[MAX_PATH];
-	struct proc *p = curr_proc();
-	copyinstr(p->pagetable, filepath, name, MAX_PATH);
-	return unlinkat(dirfd, filepath, flags);
 	//TODO: your job is to complete the syscall
-	//return -1;
+	return -1;
 }
 
 uint64 sys_sbrk(int n)
@@ -263,114 +284,6 @@ uint64 sys_sbrk(int n)
 	if (growproc(n) < 0)
 		return -1;
 	return addr;
-}
-inline int translate_port(int port)
-{
-	return (port << 1) | PTE_U;
-}
-int sys_mmap(void *start, unsigned long long len, int port, int flag, int fd)
-{
-	struct proc *p = curr_proc();
-
-	if (0 != (((uint64)start) % PGSIZE)) {
-		errorf("not aligned");
-		return -1;
-	}
-	if (len > 0x40000000) {
-		errorf("mmaping more than 1GiB");
-		return -1;
-	}
-	if (((port & (~0x7)) != 0) || ((port & 0x7) == 0)) {
-		errorf("Bad port %x", port);
-		return -1;
-	}
-	uint64 pages = (len + PGSIZE - 1) / PGSIZE;
-	for (uint64 j = 0; j < pages; j++) {
-		void *ptr = kalloc();
-		if (ptr == (void *)0) {
-			//
-			uvmunmap(p->pagetable, (uint64)start, j, 1);
-			errorf("no enough memory");
-			return -1;
-		}
-		if (0 != mappages(p->pagetable, (uint64)start + j * PGSIZE,
-				  PGSIZE, (uint64)ptr, translate_port(port))) {
-			//
-			kfree(ptr);
-			uvmunmap(p->pagetable, (uint64)start, j, 1);
-			errorf("cannot map memory");
-			return -1;
-		}
-		uint64 page_id = ((uint64)start) / PGSIZE + j;
-		if (page_id >= p->max_page)
-			p->max_page = page_id + 1;
-	}
-	return 0;
-}
-int sys_munmap(void *start, unsigned long long len)
-{
-	struct proc *p = curr_proc();
-
-	if (0 != (uint64)start % PGSIZE) {
-		errorf("not aligned");
-		return -1;
-	}
-	if (len > 0x40000000) {
-		errorf("munmaping more than 1GiB");
-		return -1;
-	}
-
-	uint64 pages = (len + PGSIZE - 1) / PGSIZE;
-	for (uint64 j = 0; j < pages; j++) {
-		if (0 == walkaddr(p->pagetable, (uint64)(start + j * PGSIZE)))
-			return -1;
-	}
-
-	uvmunmap(p->pagetable, (uint64)start, pages, 1);
-	return 0;
-}
-inline TaskStatus get_task_status(struct proc *p)
-{
-	switch (p->state) {
-	case RUNNING:
-		return Running;
-	case SLEEPING:
-	case RUNNABLE:
-		if (p->time_scheduled == (uint64)-1)
-			return UnInit;
-		else
-			return Ready;
-	case ZOMBIE:
-		return Exited;
-	case UNUSED:
-	case USED:
-	default:
-		panic("Unexpected task statis %d.", p->state);
-		return Exited;
-	}
-}
-
-uint64 sys_task_info(TaskInfo *ti)
-{
-	struct proc *p = curr_proc();
-
-	TaskInfo tti;
-	//TRANSLATE_ADDR(TaskInfo, ti);
-	tti.status = get_task_status(p);
-
-#ifdef ONLY_RUNNING_TIME
-	tti.time =
-		((p->state == RUNNING) ?
-			 (get_cycle() / (CPU_FREQ / 1000) - p->time_scheduled) :
-			 0) +
-		p->total_used_time;
-#else
-	tti.time = get_cycle() / (CPU_FREQ / 1000) - p->time_scheduled;
-#endif
-	memmove(tti.syscall_times, p->syscall_counter,
-		sizeof(unsigned int) * MAX_SYSCALL_NUM);
-	copyout(p->pagetable, (uint64)ti, (char *)&tti, sizeof(TaskInfo));
-	return 0;
 }
 
 extern char trap_page[];
@@ -383,7 +296,6 @@ void syscall()
 			   trapframe->a3, trapframe->a4, trapframe->a5 };
 	tracef("syscall %d args = [%x, %x, %x, %x, %x, %x]", id, args[0],
 	       args[1], args[2], args[3], args[4], args[5]);
-	++(curr_proc()->syscall_counter[id]);
 	switch (id) {
 	case SYS_write:
 		ret = sys_write(args[0], args[1], args[2]);
@@ -430,24 +342,23 @@ void syscall()
 	case SYS_unlinkat:
 		ret = sys_unlinkat(args[0], args[1], args[2]);
 		break;
+	case SYS_mmap:
+		ret = mmap((void *)args[0],args[1],args[2],0,0);
+		break;
+	case SYS_munmap:
+		ret = munmap((void *)args[0],args[1]);
+		break;
 	case SYS_spawn:
 		ret = sys_spawn(args[0]);
 		break;
 	case SYS_sbrk:
-		ret = sys_sbrk(args[0]);
-		break;
-	case SYS_mmap:
-		ret = sys_mmap((void *)args[0], args[1], args[2], args[3],
-			       args[4]);
-		break;
-	case SYS_munmap:
-		ret = sys_munmap((void *)args[0], args[1]);
-		break;
-	case SYS_task_info:
-		ret = sys_task_info((TaskInfo *)args[0]);
-		break;
+        ret = sys_sbrk(args[0]);
+        break;
 	case SYS_setpriority:
-		ret = sys_set_priority((long long)args[0]);
+		ret = sys_set_priority(args[0]);
+		break;
+	case SYS_taskinfo:
+		ret = sys_task_info(args[0]);
 		break;
 	default:
 		ret = -1;

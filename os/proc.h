@@ -3,10 +3,10 @@
 
 #include "riscv.h"
 #include "types.h"
-#include "syscall_ids.h"
 
 #define NPROC (512)
 #define FD_BUFFER_SIZE (16)
+#define MAX_SYSCALL_NUM 500
 
 struct file;
 
@@ -33,7 +33,6 @@ struct context {
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // Per-process state
-#define BIG_STRIDE (65536)
 struct proc {
 	enum procstate state; // Process state
 	int pid; // Process ID
@@ -45,32 +44,14 @@ struct proc {
 	uint64 max_page;
 	struct proc *parent; // Parent process
 	uint64 exit_code;
-	struct file *files
-		[FD_BUFFER_SIZE]; //File descriptor table, using to record the files opened by the process
+	struct file *files[FD_BUFFER_SIZE];
+	uint32 syscall_times[MAX_SYSCALL_NUM];
+	int stime;
 	uint64 program_brk;
 	uint64 heap_bottom;
-	uint64 time_scheduled;
-#ifdef ONLY_RUNNING_TIME
-	uint64 total_used_time;
-#endif
-
+	uint64 priority;
 	uint64 stride;
-	uint64 pass;
-	unsigned int syscall_counter[MAX_SYSCALL_NUM];
 };
-typedef enum {
-	UnInit,
-	Ready,
-	Running,
-	Exited,
-} TaskStatus;
-typedef struct {
-	TaskStatus status;
-	unsigned int syscall_times[MAX_SYSCALL_NUM];
-	int time;
-} TaskInfo;
-//directly taken from user/include/stddef.h
- 
 
 int cpuid();
 struct proc *curr_proc();
@@ -81,7 +62,6 @@ void sched();
 void yield();
 int fork();
 int exec(char *, char **);
-int spawn(char *name);
 int wait(int, int *);
 void add_task(struct proc *);
 struct proc *pop_task();
