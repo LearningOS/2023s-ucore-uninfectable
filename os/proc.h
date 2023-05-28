@@ -6,7 +6,6 @@
 
 #define NPROC (512)
 #define FD_BUFFER_SIZE (16)
-#define MAX_SYSCALL_NUM 500
 
 struct file;
 
@@ -44,13 +43,10 @@ struct proc {
 	uint64 max_page;
 	struct proc *parent; // Parent process
 	uint64 exit_code;
-	struct file *files[FD_BUFFER_SIZE];
-	uint32 syscall_times[MAX_SYSCALL_NUM];
-	int stime;
+	struct file *files
+		[FD_BUFFER_SIZE]; //File descriptor table, using to record the files opened by the process
 	uint64 program_brk;
 	uint64 heap_bottom;
-	uint64 priority;
-	uint64 stride;
 };
 
 int cpuid();

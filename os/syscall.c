@@ -142,6 +142,63 @@ uint64 sys_wait(int pid, uint64 va)
 	return wait(pid, code);
 }
 
+uint64 sys_spawn(uint64 va)
+{
+	// TODO: your job is to complete the sys call
+	char name[200];
+	struct proc *p = curr_proc();
+	struct proc *np = allocproc();
+	copyinstr(p->pagetable,name,va,200);
+	struct inode* id = namei(name);
+	bin_loader(id,np);
+	add_task(np);
+	np->parent = p;
+	return np->pid;
+	// return pid;
+	// return -1;
+}
+
+uint64 sys_openat(uint64 va, uint64 omode, uint64 _flags)
+{
+	struct proc *p = curr_proc();
+	char path[200];
+	copyinstr(p->pagetable, path, va, 200);
+	return fileopen(path, omode);
+}
+
+uint64 sys_close(int fd)
+{
+	if (fd < 0 || fd > FD_BUFFER_SIZE)
+		return -1;
+	struct proc *p = curr_proc();
+	struct file *f = p->files[fd];
+	if (f == NULL) {
+		errorf("invalid fd %d", fd);
+		return -1;
+	}
+	fileclose(f);
+	p->files[fd] = 0;
+	return 0;
+}
+
+int munmap(void* start, unsigned long long len){
+	if( (uint64)start % 4096 ) return -1;
+	if( len % 4096 ) return -1;
+	uint64 a, last;
+	a = PGROUNDDOWN((uint64)start);
+	last = PGROUNDDOWN((uint64)start + len - 1);
+	for(;;){
+		if( useraddr(curr_proc()->pagetable,a) ){
+			uvmunmap(curr_proc()->pagetable,(uint64)start,1,0);
+		}else return -1;
+		if (a == last)
+			break;
+		a += PGSIZE;
+		// curr_proc()->max_page -= 1;
+	}
+	return 0;
+}
+
 int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
 	if( len == 0 ) return 0;
 	if( len > (1<<20) ) return -1;
@@ -169,104 +226,16 @@ int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
 	return 0;
 }
 
-int munmap(void* start, unsigned long long len){
-	if( (uint64)start % 4096 ) return -1;
-	if( len % 4096 ) return -1;
-	uint64 a, last;
-	a = PGROUNDDOWN((uint64)start);
-	last = PGROUNDDOWN((uint64)start + len - 1);
-	for(;;){
-		if( useraddr(curr_proc()->pagetable,a) ){
-			uvmunmap(curr_proc()->pagetable,(uint64)start,1,0);
-		}else return -1;
-		if (a == last)
-			break;
-		a += PGSIZE;
-		// curr_proc()->max_page -= 1;
-	}
-	return 0;
-}
-
-uint64 sys_spawn(uint64 va)
-{
-	char name[200];
-	struct proc *p = curr_proc();
-	struct proc *np = allocproc();
-	copyinstr(p->pagetable,name,va,200);
-	struct inode* id = namei(name);
-	bin_loader(id,np);
-	add_task(np);
-	np->parent = p;
-	return np->pid;
-	// return pid;
-}
-
-uint64 sys_set_priority(long long prio){
-    if( prio < 2 ) return -1;
-	curr_proc()->priority = prio;
-	return prio;
-}
-
-uint64 sys_openat(uint64 va, uint64 omode, uint64 _flags)
-{
-	struct proc *p = curr_proc();
-	char path[200];
-	copyinstr(p->pagetable, path, va, 200);
-	return fileopen(path, omode);
-}
-
-uint64 sys_close(int fd)
-{
-	if (fd < 0 || fd > FD_BUFFER_SIZE)
-		return -1;
-	struct proc *p = curr_proc();
-	struct file *f = p->files[fd];
-	if (f == NULL) {
-		errorf("invalid fd %d", fd);
-		return -1;
-	}
-	fileclose(f);
-	p->files[fd] = 0;
-	return 0;
-}
-
 int sys_fstat(int fd, uint64 stat)
 {
 	//TODO: your job is to complete the syscall
 	return -1;
 }
 
-// int link(char *path ){
-// 	struct inode *ip, *dp;
-// 	dp = root_dir(); //Remember that the root_inode is open in this step,so it needs closing then.
-// 	ivalid(dp);
-// 	if ((ip = dirlookup(dp, path, 0)) != 0) {
-// 		warnf("create a exist file\n");
-// 		iput(dp); //Close the root_inode
-// 		ivalid(ip);
-// 		if (type == T_FILE && ip->type == T_FILE)
-// 			return ip;
-// 		iput(ip);
-// 		return 0;
-// 	}
-// 	if ((ip = ialloc(dp->dev, type)) == 0)
-// 		panic("create: ialloc");
-
-// 	tracef("create dinode and inode type = %d\n", type);
-
-// 	ivalid(ip);
-// 	iupdate(ip);
-// 	if (dirlink(dp, path, ip->inum) < 0)
-// 		panic("create: dirlink");
-
-// 	iput(dp);
-// 	return ip;
-// }
-
 int sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath,
 	       uint64 flags)
 {
-	
+	//TODO: your job is to complete the syscall
 	return -1;
 }
 
@@ -309,6 +278,12 @@ void syscall()
 	case SYS_close:
 		ret = sys_close(args[0]);
 		break;
+	case SYS_mmap:
+		ret = mmap((void *)args[0],args[1],args[2],0,0);
+		break;
+	case SYS_munmap:
+		ret = munmap((void *)args[0],args[1]);
+		break;
 	case SYS_exit:
 		sys_exit(args[0]);
 		// __builtin_unreachable();
@@ -342,24 +317,12 @@ void syscall()
 	case SYS_unlinkat:
 		ret = sys_unlinkat(args[0], args[1], args[2]);
 		break;
-	case SYS_mmap:
-		ret = mmap((void *)args[0],args[1],args[2],0,0);
-		break;
-	case SYS_munmap:
-		ret = munmap((void *)args[0],args[1]);
-		break;
 	case SYS_spawn:
 		ret = sys_spawn(args[0]);
 		break;
 	case SYS_sbrk:
-        ret = sys_sbrk(args[0]);
-        break;
-	case SYS_setpriority:
-		ret = sys_set_priority(args[0]);
+		ret = sys_sbrk(args[0]);
 		break;
-	// case SYS_taskinfo:
-	// 	ret = sys_task_info(args[0]);
-	// 	break;
 	default:
 		ret = -1;
 		errorf("unknown syscall %d", id);
