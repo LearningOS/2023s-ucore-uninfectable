@@ -193,8 +193,8 @@ uint64 sys_spawn(uint64 va)
 	struct proc *p = curr_proc();
 	struct proc *np = allocproc();
 	copyinstr(p->pagetable,name,va,200);
-	int id = get_id_by_name(name);
-	loader(id,np);
+	struct inode* id = namei(name);
+	bin_loader(id,np);
 	add_task(np);
 	np->parent = p;
 	return np->pid;
@@ -236,32 +236,32 @@ int sys_fstat(int fd, uint64 stat)
 	return -1;
 }
 
-int link(char *path ){
-	struct inode *ip, *dp;
-	dp = root_dir(); //Remember that the root_inode is open in this step,so it needs closing then.
-	ivalid(dp);
-	if ((ip = dirlookup(dp, path, 0)) != 0) {
-		warnf("create a exist file\n");
-		iput(dp); //Close the root_inode
-		ivalid(ip);
-		if (type == T_FILE && ip->type == T_FILE)
-			return ip;
-		iput(ip);
-		return 0;
-	}
-	if ((ip = ialloc(dp->dev, type)) == 0)
-		panic("create: ialloc");
+// int link(char *path ){
+// 	struct inode *ip, *dp;
+// 	dp = root_dir(); //Remember that the root_inode is open in this step,so it needs closing then.
+// 	ivalid(dp);
+// 	if ((ip = dirlookup(dp, path, 0)) != 0) {
+// 		warnf("create a exist file\n");
+// 		iput(dp); //Close the root_inode
+// 		ivalid(ip);
+// 		if (type == T_FILE && ip->type == T_FILE)
+// 			return ip;
+// 		iput(ip);
+// 		return 0;
+// 	}
+// 	if ((ip = ialloc(dp->dev, type)) == 0)
+// 		panic("create: ialloc");
 
-	tracef("create dinode and inode type = %d\n", type);
+// 	tracef("create dinode and inode type = %d\n", type);
 
-	ivalid(ip);
-	iupdate(ip);
-	if (dirlink(dp, path, ip->inum) < 0)
-		panic("create: dirlink");
+// 	ivalid(ip);
+// 	iupdate(ip);
+// 	if (dirlink(dp, path, ip->inum) < 0)
+// 		panic("create: dirlink");
 
-	iput(dp);
-	return ip;
-}
+// 	iput(dp);
+// 	return ip;
+// }
 
 int sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath,
 	       uint64 flags)
@@ -357,9 +357,9 @@ void syscall()
 	case SYS_setpriority:
 		ret = sys_set_priority(args[0]);
 		break;
-	case SYS_taskinfo:
-		ret = sys_task_info(args[0]);
-		break;
+	// case SYS_taskinfo:
+	// 	ret = sys_task_info(args[0]);
+	// 	break;
 	default:
 		ret = -1;
 		errorf("unknown syscall %d", id);
