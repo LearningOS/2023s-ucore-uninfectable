@@ -232,16 +232,54 @@ int sys_fstat(int fd, uint64 stat)
 	return -1;
 }
 
+int link( char* op, char* np ){
+	struct inode *ip, *dp;
+	dp = root_dir(); //Remember that the root_inode is open in this step,so it needs closing then.
+	ivalid(dp);
+	if ((ip = dirlookup(dp, np, 0)) == 0) {
+		warnf("create a exist file\n");
+		iput(dp); //Close the root_inode
+		ivalid(ip);
+		iput(ip);
+		return -1;
+	}
+	if ((ip = dirlookup(dp, op, 0)) == 0) {
+		warnf("create a exist file\n");
+		iput(dp); //Close the root_inode
+		return -1;
+	}
+	// tracef("create dinode and inode type = %d\n", type);
+	ivalid(ip);
+	ip->nlink += 1;
+	iupdate(ip);
+	if (dirlink(dp, np, ip->inum) < 0)
+		panic("create: dirlink");
+	iput(dp);
+	// return ip;
+	return 0;
+}
+
 int sys_linkat(int olddirfd, uint64 oldpath, int newdirfd, uint64 newpath,
 	       uint64 flags)
 {
-	//TODO: your job is to complete the syscall
-	return -1;
+	char op[200],np[200];
+	copyinstr(curr_proc()->pagetable,op,oldpath,200);
+	copyinstr(curr_proc()->pagetable,np,newpath,200);
+	return link(op,np);
 }
 
 int sys_unlinkat(int dirfd, uint64 name, uint64 flags)
 {
-	//TODO: your job is to complete the syscall
+	struct inode *dp;
+	dp = root_dir(); //Remember that the root_inode is open in this step,so it needs closing then.
+	ivalid(dp);
+	char op[200];
+	copyinstr(curr_proc()->pagetable,op,name,200);
+	if( !dirunlink(dp,op,0) ){
+		iput(dp);
+		return 0;
+	}
+	iput(dp);
 	return -1;
 }
 
