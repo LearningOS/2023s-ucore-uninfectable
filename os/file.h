@@ -17,8 +17,16 @@ struct inode {
 	short type; // copy of disk inode
 	uint size;
 	uint addrs[NDIRECT + 1];
-	uint nlink;
+	short nlink;
 	// LAB4: You may need to add link count here
+};
+
+struct Stat{
+    uint64 dev;
+    uint64 ino;
+    uint32 mode;
+    uint32 nlink;
+    uint64 pad[7];
 };
 
 // Defines a file in memory that provides information about the current use of the file and the corresponding inode location

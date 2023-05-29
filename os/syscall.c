@@ -228,16 +228,26 @@ int mmap(void* start, unsigned long long len,int port,int flag ,int fd){
 
 int sys_fstat(int fd, uint64 stat)
 {
-	//TODO: your job is to complete the syscall
-	return -1;
+	struct Stat op;
+	// memset(op,0,sizeof(op));
+	// iget(curr_proc()->files[fd]->ip);
+	ivalid(curr_proc()->files[fd]->ip);
+	op.ino = curr_proc()->files[fd]->ip->inum;
+	if( curr_proc()->files[fd]->ip->type == 1 ){
+		op.mode = 0x040000;
+	}else op.mode = 0x100000;
+	op.nlink = curr_proc()->files[fd]->ip->nlink;
+	op.dev = 0;
+	// iput(curr_proc()->files[fd]->ip);
+	copyout(curr_proc()->pagetable,stat,(char *)&op,sizeof(op));
+	return 0;
 }
 
 int link( char* op, char* np ){
 	struct inode *ip, *dp;
 	dp = root_dir(); //Remember that the root_inode is open in this step,so it needs closing then.
 	ivalid(dp);
-	if ((ip = dirlookup(dp, np, 0)) == 0) {
-		warnf("create a exist file\n");
+	if ((ip = dirlookup(dp, np, 0)) != 0) {
 		iput(dp); //Close the root_inode
 		ivalid(ip);
 		iput(ip);

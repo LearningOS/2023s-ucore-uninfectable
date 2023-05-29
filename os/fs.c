@@ -415,7 +415,9 @@ int dirlink(struct inode *dp, char *name, uint inum)
 		iput(ip);
 		return -1;
 	}
-
+	// ivalid(ip);
+	// ip->nlink += 1;
+	// iput(ip);
 	// Look for an empty dirent.
 	for (off = 0; off < dp->size; off += sizeof(de)) {
 		if (readi(dp, 0, (uint64)&de, off, sizeof(de)) != sizeof(de))
@@ -441,20 +443,26 @@ int dirunlink(struct inode *dp, char *name, uint inum)
 		// iput(ip);
 		return -1;
 	}
-	ivalid(ip);
-	ip->nlink -= 1;
-	iupdate(ip);
+	// ivalid(ip);
+	// ip->nlink -= 1;
+	// iupdate(ip);
 	// Look for an empty dirent.
 	for (off = 0; off < dp->size; off += sizeof(de)) {
 		if (readi(dp, 0, (uint64)&de, off, sizeof(de)) != sizeof(de))
-			panic("dirlink read");
-		if (de.inum == ip->inum)
-			break;
+			panic("dirunlink read");
+		if (0 == strncmp(name, de.name,sizeof(de.name))) {
+			memset(&de, 0, sizeof(de));
+			if (writei(dp, 0, (uint64)&de, off, sizeof(de)) != sizeof(de))
+				panic("dirunlink write");
+		}
 	}
 	// strncpy(de.name, name, DIRSIZ);
-	de.inum = 0;
-	if (writei(dp, 0, (uint64)&de, off, sizeof(de)) != sizeof(de))
-		panic("dirlink");
+	// de.inum = 0;
+	// if (writei(dp, 0, (uint64)&de, off, sizeof(de)) != sizeof(de))
+	// 	panic("dirlink");
+	ivalid(ip);
+	ip->nlink -= 1;
+	iupdate(ip);
 	iput(ip);
 	return 0;
 }
