@@ -142,6 +142,11 @@ found:
 	p->next_mutex_id = 0;
 	p->next_semaphore_id = 0;
 	p->next_condvar_id = 0;
+	// memset((void *)p->Wk,0,sizeof(p->Wk));
+	memset((void *)p->Al,0,sizeof(p->Al));
+	memset((void *)p->Av,0,sizeof(p->Av));
+	memset((void *)p->Re,0,sizeof(p->Re));
+	// memset((void *)p->Fi,0,sizeof(p->Wk));
 	// LAB5: (1) you may initialize your new proc variables here
 	return p;
 }

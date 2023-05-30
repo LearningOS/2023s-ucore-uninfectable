@@ -60,9 +60,14 @@ struct proc {
 	struct thread threads[NTHREAD];
 	// Use dummy increasing id as index index of lock pool because we don't have destroy method yet
 	uint next_mutex_id, next_semaphore_id, next_condvar_id;
+	uint64 dlflg;
 	struct mutex mutex_pool[LOCK_POOL_SIZE];
 	struct semaphore semaphore_pool[LOCK_POOL_SIZE];
 	struct condvar condvar_pool[LOCK_POOL_SIZE];
+	uint64 Av[LOCK_POOL_SIZE];
+	uint64 Al[NTHREAD][LOCK_POOL_SIZE];
+	uint64 Re[NTHREAD][LOCK_POOL_SIZE];
+	uint64 Wk[NTHREAD],Fi[NTHREAD];
 	// LAB5: (1) Define your variables for deadlock detect here.
 	//			 You may need a flag to record if detection enabled,
 	//       and some arrays for detection algorithm.

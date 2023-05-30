@@ -259,15 +259,73 @@ int sys_mutex_create(int blocking)
 	}
 	// LAB5: (4-1) You may want to maintain some variables for detect here
 	int mutex_id = m - curr_proc()->mutex_pool;
+	if(curr_proc()->dlflg){
+		struct proc *p = curr_proc();
+		p->Av[mutex_id] = 1;
+	}
 	debugf("create mutex %d", mutex_id);
 	return mutex_id;
 }
-
+int detect(){
+	struct proc *p = curr_proc();
+	// struct thread *s = curr_thread();
+	// p->Re[s->tid][mutex_id] += 1;
+	uint64 Wk[LOCK_POOL_SIZE],Fi[NTHREAD];
+	for( uint64 i = 0 ; i < NTHREAD ; ++i ){
+		Fi[i] = 0;
+	}
+	for( uint64 i = 0 ; i < LOCK_POOL_SIZE ; ++i ){
+		Wk[i] = p->Av[i];
+	}
+	// uint8 FG = 0;
+	while(1){
+		uint8 flag = 0;
+		// printf("\n%d %d %d\n",Wk[0],p->Re[s->tid][0],Fi[s->tid]);
+		for( uint64 i = 0 ; i < NTHREAD ; ++i ){
+			uint8 fg = 0;
+			if( !Fi[i] ){
+				for( uint64 j = 0 ; j < LOCK_POOL_SIZE ;++j ){
+					if( p->Re[i][j] > Wk[j] ){
+						fg = 1;
+						break;
+					}
+				}
+				if( !fg ){
+					for( uint64 j = 0 ; j < LOCK_POOL_SIZE ;++j ){
+						Wk[j] += p->Al[i][j];
+					}
+					flag = 1;
+					Fi[i] = 1;
+				}
+			}
+		}
+		if( !flag ){
+			for( uint64 i = 0 ; i < NTHREAD ; ++i ){
+				if(!Fi[i]){
+					// printf("yes");
+					return 0;
+				}
+			}
+			break;
+		}
+	}
+	return 1;
+}
 int sys_mutex_lock(int mutex_id)
 {
 	if (mutex_id < 0 || mutex_id >= curr_proc()->next_mutex_id) {
 		errorf("Unexpected mutex id %d", mutex_id);
 		return -1;
+	}
+	struct proc *p = curr_proc();
+	struct thread *s = curr_thread();
+	p->Re[s->tid][mutex_id] += 1;
+	// printf("%d\n",p->Re[s->tid][mutex_id]);
+	if(!detect()) return -0xdead;
+	else if(p->Av[mutex_id]){
+		p->Re[s->tid][mutex_id] -= 1;
+		p->Av[mutex_id] -= 1;
+		p->Al[s->tid][mutex_id] += 1;
 	}
 	// LAB5: (4-1) You may want to maintain some variables for detect
 	//       or call your detect algorithm here
@@ -281,6 +339,10 @@ int sys_mutex_unlock(int mutex_id)
 		errorf("Unexpected mutex id %d", mutex_id);
 		return -1;
 	}
+	struct proc *p = curr_proc();
+	struct thread *s = curr_thread();
+	p->Av[mutex_id] += 1;
+	p->Al[s->tid][mutex_id] -= 1;
 	// LAB5: (4-1) You may want to maintain some variables for detect here
 	mutex_unlock(&curr_proc()->mutex_pool[mutex_id]);
 	return 0;
@@ -295,6 +357,10 @@ int sys_semaphore_create(int res_count)
 	}
 	// LAB5: (4-2) You may want to maintain some variables for detect here
 	int sem_id = s - curr_proc()->semaphore_pool;
+	if(curr_proc()->dlflg){
+		struct proc *p = curr_proc();
+		p->Av[sem_id] = res_count;
+	}
 	debugf("create semaphore %d", sem_id);
 	return sem_id;
 }
@@ -306,6 +372,10 @@ int sys_semaphore_up(int semaphore_id)
 		errorf("Unexpected semaphore id %d", semaphore_id);
 		return -1;
 	}
+	struct proc *p = curr_proc();
+	struct thread *s = curr_thread();
+	p->Av[semaphore_id] += 1;
+	p->Al[s->tid][semaphore_id] -= 1;
 	// LAB5: (4-2) You may want to maintain some variables for detect here
 	semaphore_up(&curr_proc()->semaphore_pool[semaphore_id]);
 	return 0;
@@ -317,6 +387,16 @@ int sys_semaphore_down(int semaphore_id)
 	    semaphore_id >= curr_proc()->next_semaphore_id) {
 		errorf("Unexpected semaphore id %d", semaphore_id);
 		return -1;
+	}
+	struct proc *p = curr_proc();
+	struct thread *s = curr_thread();
+	p->Re[s->tid][semaphore_id] += 1;
+	// printf("%d\n",p->Re[s->tid][mutex_id]);
+	if(!detect()) return -0xdead;
+	else if(p->Av[semaphore_id]){
+		p->Re[s->tid][semaphore_id] -= 1;
+		p->Av[semaphore_id] -= 1;
+		p->Al[s->tid][semaphore_id] += 1;
 	}
 	// LAB5: (4-2) You may want to maintain some variables for detect
 	//       or call your detect algorithm here
@@ -358,6 +438,13 @@ int sys_condvar_wait(int cond_id, int mutex_id)
 	}
 	cond_wait(&curr_proc()->condvar_pool[cond_id],
 		  &curr_proc()->mutex_pool[mutex_id]);
+	return 0;
+}
+
+int sys_enable_deadlock_detect(int flag){
+	if( flag == 1 ) curr_proc()->dlflg = 1;
+	else if( !flag ) curr_proc()->dlflg = 0;
+	else return -1;
 	return 0;
 }
 
@@ -453,6 +540,9 @@ void syscall()
 		break;
 	case SYS_condvar_wait:
 		ret = sys_condvar_wait(args[0], args[1]);
+		break;
+	case SYS_enable_deadlock_detect:
+		ret = sys_enable_deadlock_detect(args[0]);
 		break;
 	// LAB5: (2) you may need to add case SYS_enable_deadlock_detect here
 	default:
