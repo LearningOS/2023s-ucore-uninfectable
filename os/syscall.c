@@ -318,14 +318,16 @@ int sys_mutex_lock(int mutex_id)
 		return -1;
 	}
 	struct proc *p = curr_proc();
-	struct thread *s = curr_thread();
-	p->Re[s->tid][mutex_id] += 1;
-	// printf("%d\n",p->Re[s->tid][mutex_id]);
-	if(!detect()) return -0xdead;
-	else if(p->Av[mutex_id]){
-		p->Re[s->tid][mutex_id] -= 1;
-		p->Av[mutex_id] -= 1;
-		p->Al[s->tid][mutex_id] += 1;
+	if(p->dlflg){
+		struct thread *s = curr_thread();
+		p->Re[s->tid][mutex_id] += 1;
+		// printf("%d\n",p->Re[s->tid][mutex_id]);
+		if(!detect()) return -0xdead;
+		else if(p->Av[mutex_id]){
+			p->Re[s->tid][mutex_id] -= 1;
+			p->Av[mutex_id] -= 1;
+			p->Al[s->tid][mutex_id] += 1;
+		}
 	}
 	// LAB5: (4-1) You may want to maintain some variables for detect
 	//       or call your detect algorithm here
@@ -340,9 +342,11 @@ int sys_mutex_unlock(int mutex_id)
 		return -1;
 	}
 	struct proc *p = curr_proc();
-	struct thread *s = curr_thread();
-	p->Av[mutex_id] += 1;
-	p->Al[s->tid][mutex_id] -= 1;
+	if(p->dlflg){
+		struct thread *s = curr_thread();
+		p->Av[mutex_id] += 1;
+		p->Al[s->tid][mutex_id] -= 1;
+	}
 	// LAB5: (4-1) You may want to maintain some variables for detect here
 	mutex_unlock(&curr_proc()->mutex_pool[mutex_id]);
 	return 0;
@@ -373,9 +377,11 @@ int sys_semaphore_up(int semaphore_id)
 		return -1;
 	}
 	struct proc *p = curr_proc();
-	struct thread *s = curr_thread();
-	p->Av[semaphore_id] += 1;
-	p->Al[s->tid][semaphore_id] -= 1;
+	if(p->dlflg){
+		struct thread *s = curr_thread();
+		p->Av[semaphore_id] += 1;
+		p->Al[s->tid][semaphore_id] -= 1;
+	}
 	// LAB5: (4-2) You may want to maintain some variables for detect here
 	semaphore_up(&curr_proc()->semaphore_pool[semaphore_id]);
 	return 0;
@@ -389,14 +395,16 @@ int sys_semaphore_down(int semaphore_id)
 		return -1;
 	}
 	struct proc *p = curr_proc();
-	struct thread *s = curr_thread();
-	p->Re[s->tid][semaphore_id] += 1;
-	// printf("%d\n",p->Re[s->tid][mutex_id]);
-	if(!detect()) return -0xdead;
-	else if(p->Av[semaphore_id]){
-		p->Re[s->tid][semaphore_id] -= 1;
-		p->Av[semaphore_id] -= 1;
-		p->Al[s->tid][semaphore_id] += 1;
+	if(p->dlflg){
+		struct thread *s = curr_thread();
+		p->Re[s->tid][semaphore_id] += 1;
+		// printf("%d\n",p->Re[s->tid][mutex_id]);
+		if(!detect()) return -0xdead;
+		else if(p->Av[semaphore_id]){
+			p->Re[s->tid][semaphore_id] -= 1;
+			p->Av[semaphore_id] -= 1;
+			p->Al[s->tid][semaphore_id] += 1;
+		}
 	}
 	// LAB5: (4-2) You may want to maintain some variables for detect
 	//       or call your detect algorithm here

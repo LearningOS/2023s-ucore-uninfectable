@@ -67,7 +67,7 @@ struct proc {
 	uint64 Av[LOCK_POOL_SIZE];
 	uint64 Al[NTHREAD][LOCK_POOL_SIZE];
 	uint64 Re[NTHREAD][LOCK_POOL_SIZE];
-	uint64 Wk[NTHREAD],Fi[NTHREAD];
+	// uint64 Wk[NTHREAD],Fi[NTHREAD];
 	// LAB5: (1) Define your variables for deadlock detect here.
 	//			 You may need a flag to record if detection enabled,
 	//       and some arrays for detection algorithm.
